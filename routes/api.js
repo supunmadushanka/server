@@ -1,8 +1,14 @@
 const express = require('express');
 const router = express.Router();
 const jwt = require('jsonwebtoken');
+const emailExistence = require('email-existence');
+var nodemailer = require('nodemailer');
+
+const bcrypt = require('bcrypt');
+const saltRounds = 5;
 
 const sql = require('mssql');
+const e = require('express');
 const sqlconfig = {
     user: 'sa',
     password: '123',
@@ -38,103 +44,6 @@ router.get('/', (req, res) => {
 //Ctrl+K+C
 //Ctrl+K+U
 
-router.post('/tempregister', (req, res) => {
-
-    sql.connect(sqlconfig).then(pool => {
-
-        return pool.request()
-            .input('userEmail', sql.VarChar(50), req.body.userEmail)
-            .input('userPassword', sql.VarChar(20), req.body.password)
-            .execute('tempregister')
-    }).then(result => {
-        let payload = { subject: req.body._id }
-        let token = jwt.sign(payload, 'secretKey')
-        res.status(200).send({ token });
-        console.dir(result)
-    }).catch(err => {
-        console.log(err);
-    })
-
-
-})
-
-router.post('/checkuser', (req, res) => {
-
-    sql.connect(sqlconfig).then(pool => {
-
-        return pool.request()
-            .input('userEmail', sql.VarChar(50), req.body.userEmail)
-            .output('Exist', sql.Int)
-            .execute('proccheckuseremail', (err, result) => {
-                if (err) {
-                    console.log(err);
-                } else {
-                    if (result.output.Exist == 0) {
-                        let payload = { subject: req.body._id }
-                        let token = jwt.sign(payload, 'secretKey')
-                        res.status(200).send({ token });
-                        console.dir(result)
-                    } else {
-                        res.status(401).send('invalid')
-                    }
-                    //res.status(200).send(result);
-                }
-            })
-    }).then((res, err) => {
-        console.dir('completed')
-    }).catch(err => {
-        console.log(err);
-    })
-
-})
-
-router.post('/login', (req, res) => {
-    console.log(req.body);
-
-    sql.connect(sqlconfig).then(pool => {
-
-        return pool.request()
-            .input('userEmail', sql.VarChar(50), req.body.userEmail)
-            .input('userPassword', sql.VarChar(20), req.body.password)
-            .output('Exist', sql.Int)
-            .execute('proccheckuser', (err, result) => {
-                if (err) {
-                    console.log(err);
-                } else {
-                    if (result.output.Exist == 1) {
-                        let payload = { subject: req.body._id }
-                        let token = jwt.sign(payload, 'secretKey')
-                        res.status(200).send({ token });
-                    } else {
-                        res.status(401).send('invalid')
-                    }
-                    //res.status(200).send(result);
-                }
-            })
-    }).then((res, err) => {
-        console.dir(result)
-    }).catch(err => {
-        console.log(err);
-    })
-
-})
-
-router.get('/user', function(req, res) {
-    let connection = sql.connect(sqlconfig, (err) => {
-        if (err) {
-            console.log(err);
-        } else {
-            var request = new sql.Request();
-            request.query('select * from Appuser', function(er, recordset3) {
-                if (err)
-                    console.log(er);
-                else {
-                    res.send(recordset3.recordset);
-                }
-            });
-        }
-    });
-})
 
 
 //Admin
@@ -685,6 +594,63 @@ router.get('/getselectedtournament', function(req, res) {
     })
 })
 
+router.get('/getnewtournament', function(req, res) {
+
+    var Email = req.get('Email')
+    console.log('my email is ' + Email);
+
+    sql.connect(sqlconfig).then(pool => {
+
+        return pool.request()
+            .input('userEmail', sql.VarChar(50), Email)
+            .output('Exist', sql.Int)
+            .execute('getinstituteid', (err, result) => {
+                if (err) {
+                    console.log(err);
+                } else {
+                    console.log(result);
+                    let connection = sql.connect(sqlconfig, (err) => {
+                        if (err) {
+                            console.log(err);
+                        } else {
+                            var request = new sql.Request();
+                            request
+                                .input('institute', sql.Int, result.output.Exist)
+                                .query('select * from Tournament t,Sport s where not exists( select * from Tournament_Institute ti where instituteId=@institute AND ti.tournementId=t.tournementId) AND t.sportId=s.sportId', function(er, recordset) {
+                                    if (err)
+                                        console.log(er);
+                                    else {
+                                        console.log(recordset.recordset);
+                                        res.send(recordset.recordset);
+                                    }
+                                });
+                        }
+                    });
+                }
+            })
+    }).then((result) => {}).catch(err => {})
+})
+
+router.post('/jointournament', (req, res) => {
+
+    var Email = req.get('Email')
+    var tournementId = req.query.tournementId
+
+    sql.connect(sqlconfig).then(pool => {
+
+        return pool.request()
+            .input('userEmail', sql.VarChar(50), Email)
+            .input('tournementId', sql.Int, tournementId)
+            .execute('jointour')
+    }).then(result => {
+        console.dir(req.body)
+    }).catch(err => {
+        console.log(err);
+    })
+
+    res.status(200).send({ "message": "Data received" });
+})
+
 router.get('/getfixturefirstteam', function(req, res) {
 
     var Email = req.get('Email')
@@ -984,6 +950,171 @@ router.get('/getTotal', function(req, res) {
     })
 })
 
+router.get('/getsummery', function(req, res) {
+
+    var tournamentId = req.query.tournamentId
+
+    sql.connect(sqlconfig).then(pool => {
+        let connection = sql.connect(sqlconfig, (err) => {
+            if (err) {
+                console.log(err);
+            } else {
+                var request = new sql.Request();
+                request
+                    .input('tournamentId', sql.Int, tournamentId)
+                    .query('select * from tournamentsummery where tournementId=@tournamentId', function(er, recordset) {
+                        if (err)
+                            console.log(er);
+                        else {
+                            res.send(recordset.recordset);
+                            console.log(recordset.recordset);
+                        }
+                    });
+            }
+        });
+    })
+})
+
+router.get('/getinstituteteamcount', function(req, res) {
+
+    var Email = req.get('Email')
+
+    sql.connect(sqlconfig).then(pool => {
+
+        return pool.request()
+            .input('userEmail', sql.VarChar(50), Email)
+            .output('Exist', sql.Int)
+            .execute('getinstituteid', (err, result) => {
+                if (err) {
+                    console.log(err);
+                } else {
+                    console.log(result);
+                    let connection = sql.connect(sqlconfig, (err) => {
+                        if (err) {
+                            console.log(err);
+                        } else {
+                            var request = new sql.Request();
+                            request
+                                .input('institute', sql.Int, result.output.Exist)
+                                .query('select count(teamId) as noOfTeams from Team where instituteId=@institute', function(er, recordset) {
+                                    if (err)
+                                        console.log(er);
+                                    else {
+                                        res.send(recordset.recordset);
+                                    }
+                                });
+                        }
+                    });
+                }
+            })
+    }).then((result) => {}).catch(err => {})
+})
+
+router.get('/getinstitutecoachcount', function(req, res) {
+
+    var Email = req.get('Email')
+
+    sql.connect(sqlconfig).then(pool => {
+
+        return pool.request()
+            .input('userEmail', sql.VarChar(50), Email)
+            .output('Exist', sql.Int)
+            .execute('getinstituteid', (err, result) => {
+                if (err) {
+                    console.log(err);
+                } else {
+                    console.log(result);
+                    let connection = sql.connect(sqlconfig, (err) => {
+                        if (err) {
+                            console.log(err);
+                        } else {
+                            var request = new sql.Request();
+                            request
+                                .input('institute', sql.Int, result.output.Exist)
+                                .query('select count(userId) as noOfCoaches from Coach where instituteId=@institute', function(er, recordset) {
+                                    if (err)
+                                        console.log(er);
+                                    else {
+                                        res.send(recordset.recordset);
+                                    }
+                                });
+                        }
+                    });
+                }
+            })
+    }).then((result) => {}).catch(err => {})
+})
+
+router.get('/getinstituteplayercount', function(req, res) {
+
+    var Email = req.get('Email')
+
+    sql.connect(sqlconfig).then(pool => {
+
+        return pool.request()
+            .input('userEmail', sql.VarChar(50), Email)
+            .output('Exist', sql.Int)
+            .execute('getinstituteid', (err, result) => {
+                if (err) {
+                    console.log(err);
+                } else {
+                    console.log(result);
+                    let connection = sql.connect(sqlconfig, (err) => {
+                        if (err) {
+                            console.log(err);
+                        } else {
+                            var request = new sql.Request();
+                            request
+                                .input('institute', sql.Int, result.output.Exist)
+                                .query('select count(playerId) as noOfPlayers from Team_Player tp,Team t where tp.teamId=t.teamId AND instituteId=@institute', function(er, recordset) {
+                                    if (err)
+                                        console.log(er);
+                                    else {
+                                        res.send(recordset.recordset);
+                                    }
+                                });
+                        }
+                    });
+                }
+            })
+    }).then((result) => {}).catch(err => {})
+})
+
+router.get('/getinstituteprofile', function(req, res) {
+
+    var Email = req.get('Email')
+
+    sql.connect(sqlconfig).then(pool => {
+
+        return pool.request()
+            .input('userEmail', sql.VarChar(50), Email)
+            .output('Exist', sql.Int)
+            .execute('getinstituteid', (err, result) => {
+                if (err) {
+                    console.log(err);
+                } else {
+                    console.log(result);
+                    let connection = sql.connect(sqlconfig, (err) => {
+                        if (err) {
+                            console.log(err);
+                        } else {
+                            var request = new sql.Request();
+                            request
+                                .input('institute', sql.Int, result.output.Exist)
+                                .query('select * from institute where instituteId=@institute', function(er, recordset) {
+                                    if (err)
+                                        console.log(er);
+                                    else {
+                                        res.send(recordset.recordset);
+                                    }
+                                });
+                        }
+                    });
+                }
+            })
+    }).then((result) => {}).catch(err => {})
+})
+
 router.post('/addfixtureplayer', (req, res) => {
 
     var Email = req.get('Email')
@@ -1010,7 +1141,7 @@ router.post('/addfixtureplayer', (req, res) => {
                                 .input('fixtureId', sql.Int, fixtureId)
                                 .input('tournamentTeamId', sql.Int, result.output.tournamentTeamId)
                                 .input('userId', sql.Int, userId)
-                                .query('insert into Player_Fixture values(@fixtureId,@userId,null,null,@tournamentTeamId)', function(er, recordset) {
+                                .query('insert into Player_Fixture values(@fixtureId,@userId,null,null,@tournamentTeamId,1,null)', function(er, recordset) {
                                     if (err)
                                         console.log(er);
                                     else {}
@@ -1080,6 +1211,25 @@ router.post('/startfixture', (req, res) => {
         return pool.request()
             .input('fixtureId', sql.Int, fixtureId)
             .execute('startfixture')
+    }).then(result => {
+        console.dir(req.body)
+    }).catch(err => {
+        console.log(err);
+    })
+
+    res.status(200).send({ "message": "Data received" });
+})
+
+router.post('/postponefixture', (req, res) => {
+
+    var fixtureId = req.query.fixtureId
+    console.log('my fixture is :' + fixtureId)
+
+    sql.connect(sqlconfig).then(pool => {
+
+        return pool.request()
+            .input('fixtureId', sql.Int, fixtureId)
+            .execute('postponefixture')
     }).then(result => {
         console.dir(req.body)
     }).catch(err => {
@@ -1235,6 +1385,30 @@ router.post('/registerfixture', function(req, res) {
 
 //Player
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+router.get('/getplayerId', function(req, res) {
+
+    var Email = req.get('Email')
+
+    sql.connect(sqlconfig).then(pool => {
+        let connection = sql.connect(sqlconfig, (err) => {
+            if (err) {
+                console.log(err);
+            } else {
+                var request = new sql.Request();
+                request
+                    .input('Email', sql.VarChar(50), Email)
+                    .query('select * from Appuser where userEmail=@Email', function(er, recordset) {
+                        if (err)
+                            console.log(er);
+                        else {
+                            res.send(recordset.recordset);
+                            console.log(recordset.recordset);
+                        }
+                    });
+            }
+        });
+    })
+})
 
 router.get('/playerteams', function(req, res) {
 
@@ -1274,17 +1448,73 @@ router.get('/playerteams', function(req, res) {
     }).then((result) => {}).catch(err => {})
 })
 
+router.get('/getplayerteams', function(req, res) {
 
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    var userId = req.query.userId
 
-router.post('/register', verifyToken, function(req, res) {
+    sql.connect(sqlconfig).then(pool => {
+        let connection = sql.connect(sqlconfig, (err) => {
+            if (err) {
+                console.log(err);
+            } else {
+                var request = new sql.Request();
+                request
+                    .input('userId', sql.Int, userId)
+                    .query('select * from playersteam where playerId=@userId', function(er, recordset) {
+                        if (err)
+                            console.log(er);
+                        else {
+                            res.send(recordset.recordset);
+                            console.log(recordset.recordset);
+                        }
+                    });
+            }
+        });
+    })
+})
+
+router.get('/getplayerprofile', function(req, res) {
+
+    var userId = req.query.userId
+
+    sql.connect(sqlconfig).then(pool => {
+        let connection = sql.connect(sqlconfig, (err) => {
+            if (err) {
+                console.log(err);
+            } else {
+                var request = new sql.Request();
+                request
+                    .input('userId', sql.Int, userId)
+                    .query('select * from Player where userId=@userId', function(er, recordset) {
+                        if (err)
+                            console.log(er);
+                        else {
+                            res.send(recordset.recordset);
+                            console.log(recordset.recordset);
+                        }
+                    });
+            }
+        });
+    })
+})
+
+router.post('/changeprofileplayer', function(req, res) {
+
+    var userId = req.query.userId
     console.log(req.body);
+
     sql.connect(sqlconfig).then(pool => {
 
         return pool.request()
-            .input('userEmail', sql.VarChar(30), req.body.userEmail)
-            .input('RoleId', sql.VarChar(10), req.body.userType)
-            .execute('register')
+            .input('userId', sql.VarChar(30), userId)
+            .input('playerFName', sql.VarChar(20), req.body.firstNamePlayer)
+            .input('playerLName', sql.VarChar(20), req.body.secondNamePlayer)
+            .input('playerAddress', sql.VarChar(100), req.body.perAddressPlayer)
+            .input('playerteleNum', sql.Int, req.body.teleNoPlayer)
+            .input('playerWeight', sql.Int, req.body.weightPlayer)
+            .input('playerHeight', sql.Int, req.body.heightPlayer)
+            .input('playerBloodGroup', sql.VarChar(3), req.body.bloodSelect)
+            .execute('updateplayer')
     }).then(result => {
         console.dir(result)
     }).catch(err => {
@@ -1294,18 +1524,502 @@ router.post('/register', verifyToken, function(req, res) {
     res.status(200).send({ "message": "Data received" });
 })
 
-router.post('/playerregister', function(req, res) {
+router.post('/changePassword', function(req, res) {
+
+    var userId = req.query.userId
     console.log(req.body);
+
+    sql.connect(sqlconfig).then(pool => {
+
+        return pool.request()
+            .input('userId', sql.Int, userId)
+            .input('userPassword', sql.VarChar(20), req.body.password)
+            .execute('changePassword')
+    }).then(result => {
+        console.dir(result)
+    }).catch(err => {
+        console.log(err);
+    })
+
+    res.status(200).send({ "message": "Data received" });
+})
+
+router.post('/addachievplayer', function(req, res) {
+
+    var userId = req.query.userId
+
+    sql.connect(sqlconfig).then(pool => {
+
+        return pool.request()
+            .input('userId', sql.Int, userId)
+            .input('playerAchievements', sql.VarChar(120), req.body.achievecontent)
+            .execute('AddPlayerAchieve')
+    }).then(result => {
+        console.dir(req.body)
+    }).catch(err => {
+        console.log(err);
+    })
+
+    res.status(200).send({ "message": "Data received" });
+})
+
+router.get('/getplayerachiev', function(req, res) {
+
+    var userId = req.query.userId
+
+    sql.connect(sqlconfig).then(pool => {
+        let connection = sql.connect(sqlconfig, (err) => {
+            if (err) {
+                console.log(err);
+            } else {
+                var request = new sql.Request();
+                request
+                    .input('userId', sql.Int, userId)
+                    .query('select * from Achievements where userId=@userId', function(er, recordset) {
+                        if (err)
+                            console.log(er);
+                        else {
+                            res.send(recordset.recordset);
+                            console.log(recordset.recordset);
+                        }
+                    });
+            }
+        });
+    })
+})
+
+router.get('/institutes', function(req, res) {
+
+    sql.connect(sqlconfig).then(pool => {
+        let connection = sql.connect(sqlconfig, (err) => {
+            if (err) {
+                console.log(err);
+            } else {
+                var request = new sql.Request();
+                request
+                    .query('select * from institute', function(er, recordset) {
+                        if (err)
+                            console.log(er);
+                        else {
+                            res.send(recordset.recordset);
+                            console.log(recordset.recordset);
+                        }
+                    });
+            }
+        });
+    })
+})
+
+router.get('/getplayerfixtures', function(req, res) {
+
+    var userId = req.query.userId
+
+    sql.connect(sqlconfig).then(pool => {
+        let connection = sql.connect(sqlconfig, (err) => {
+            if (err) {
+                console.log(err);
+            } else {
+                var request = new sql.Request();
+                request
+                    .input('userId', sql.Int, userId)
+                    .query('select * from Player_Fixture pf,Fixture f,Tournament t where pf.fixtureId=f.fixtureId AND PlayerId=@userId AND fixtureState is null AND t.tournementId=f.tournementId', function(er, recordset) {
+                        if (err)
+                            console.log(er);
+                        else {
+                            res.send(recordset.recordset);
+                            console.log(recordset.recordset);
+                        }
+                    });
+            }
+        });
+    })
+})
+
+router.post('/changeavailability', function(req, res) {
+
+    var userId = req.query.userId
+    var fixtureId = req.query.fixtureId
+    var tournamentTeamId = req.query.tournamentTeamId
+
+    sql.connect(sqlconfig).then(pool => {
+
+        return pool.request()
+            .input('fixtureId', sql.Int, fixtureId)
+            .input('playerID', sql.Int, userId)
+            .input('tournamentTeamId', sql.Int, tournamentTeamId)
+            .input('AvaialReason', sql.VarChar(200), req.body.availabilityreson)
+            .execute('changeavailability')
+    }).then(result => {
+        console.dir(req.body)
+    }).catch(err => {
+        console.log(err);
+    })
+
+    res.status(200).send({ "message": "Data received" });
+})
+
+
+//coach
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+router.get('/getcoachprofile', function(req, res) {
+
+    var userId = req.query.userId
+
+    sql.connect(sqlconfig).then(pool => {
+        let connection = sql.connect(sqlconfig, (err) => {
+            if (err) {
+                console.log(err);
+            } else {
+                var request = new sql.Request();
+                request
+                    .input('userId', sql.Int, userId)
+                    .query('select * from Coach where userId=@userId', function(er, recordset) {
+                        if (err)
+                            console.log(er);
+                        else {
+                            res.send(recordset.recordset);
+                            console.log(recordset.recordset);
+                        }
+                    });
+            }
+        });
+    })
+})
+
+router.get('/getCoachTeams', function(req, res) {
+
+    var userId = req.query.userId
+
+    sql.connect(sqlconfig).then(pool => {
+        let connection = sql.connect(sqlconfig, (err) => {
+            if (err) {
+                console.log(err);
+            } else {
+                var request = new sql.Request();
+                request
+                    .input('userId', sql.Int, userId)
+                    .query('select * from Team t,Sport s,Struture st where t.coachId=@userId AND t.sportId=s.sportId AND st.strutureId=t.strutureId', function(er, recordset) {
+                        if (err)
+                            console.log(er);
+                        else {
+                            res.send(recordset.recordset);
+                            console.log(recordset.recordset);
+                        }
+                    });
+            }
+        });
+    })
+})
+
+router.post('/changeprofilecoach', function(req, res) {
+
+    var userId = req.query.userId
+    console.log(req.body);
+
+    sql.connect(sqlconfig).then(pool => {
+
+        return pool.request()
+            .input('userId', sql.VarChar(30), userId)
+            .input('coachFName', sql.VarChar(20), req.body.firstNameCoach)
+            .input('coachLName', sql.VarChar(20), req.body.lastNameCoach)
+            .input('coachAddress', sql.VarChar(100), req.body.addressAdmin)
+            .input('coachNumber', sql.Int, req.body.teleNoCoach)
+            .execute('updatecoach')
+    }).then(result => {
+        console.dir(result)
+    }).catch(err => {
+        console.log(err);
+    })
+
+    res.status(200).send({ "message": "Data received" });
+})
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+router.post('/tempregister', (req, res) => {
+
+    sql.connect(sqlconfig).then(pool => {
+
+        return pool.request()
+            .input('userEmail', sql.VarChar(50), req.body.userEmail)
+            .input('userPassword', sql.VarChar(20), req.body.password)
+            .execute('tempregister')
+    }).then(result => {
+        let payload = { subject: req.body._id }
+        let token = jwt.sign(payload, 'secretKey')
+        res.status(200).send({ token });
+        console.dir(result)
+    }).catch(err => {
+        console.log(err);
+    })
+
+
+})
+
+router.post('/tempregisterr', (req, res) => {
+
+    bcrypt.hash(req.body.password, saltRounds, function(err, hash) {
+        sql.connect(sqlconfig).then(pool => {
+
+            return pool.request()
+                .input('userEmail', sql.VarChar(50), req.body.userEmail)
+                .input('userPassword', sql.VarChar(20), hash)
+                .execute('tempregister')
+        }).then(result => {
+            let payload = { subject: req.body._id }
+            let token = jwt.sign(payload, 'secretKey')
+            res.status(200).send({ token });
+            console.dir(result)
+        }).catch(err => {
+            console.log(err);
+        })
+    });
+
+})
+
+router.post('/chackemail', (req, respond) => {
+    emailExistence.check(req.body.userEmail, function(err, res) {
+        console.log('res: ' + res);
+        if (res == false) {
+            respond.status(401).send('invalid')
+        } else {
+            respond.status(200).send({ "message": "Data received" });
+        }
+    });
+})
+
+router.post('/sendmail', (req, respond) => {
+
+    var email = req.body.userEmail
+
+    let testAccount = nodemailer.createTestAccount();
+
+    var transporter = nodemailer.createTransport({
+        host: 'smtp.gmail.com',
+        secure: true,
+        auth: {
+            type: "login",
+            port: 587,
+            secure: false,
+            user: 'supunmadushanka19980822@gmail.com',
+            pass: 'mynameissuperman#'
+        }
+    });
+
+    var mailOptions = {
+        from: 'supunmadushanka19980822@gmail.com',
+        to: 'madushanka.18@itfac.mrt.ac.lk',
+        subject: 'Click to activate acount',
+        html: '<a href="http://localhost:4200/home">localhost:4200/home</a>'
+    };
+
+    transporter.sendMail(mailOptions, function(error, info) {
+        if (error) {
+            console.log(error);
+        } else {
+            console.log('Email sent: ' + info.response);
+        }
+    });
+})
+
+router.post('/checkuser', (req, res) => {
+
+    sql.connect(sqlconfig).then(pool => {
+
+        return pool.request()
+            .input('userEmail', sql.VarChar(50), req.body.userEmail)
+            .output('Exist', sql.Int)
+            .execute('proccheckuseremail', (err, result) => {
+                if (err) {
+                    console.log(err);
+                } else {
+                    if (result.output.Exist == 0) {
+                        let payload = { subject: req.body._id }
+                        let token = jwt.sign(payload, 'secretKey')
+                        res.status(200).send({ token });
+                        console.dir(result)
+                    } else {
+                        res.status(401).send('invalid')
+                    }
+                    //res.status(200).send(result);
+                }
+            })
+    }).then((res, err) => {
+        console.dir('completed')
+    }).catch(err => {
+        console.log(err);
+    })
+
+})
+
+router.post('/loginn', (req, res) => {
+    console.log(req.body);
+
+    sql.connect(sqlconfig).then(pool => {
+
+        return pool.request()
+            .input('userEmail', sql.VarChar(50), req.body.userEmail)
+            .input('userPassword', sql.VarChar(20), req.body.password)
+            .output('Exist', sql.Int)
+            .execute('proccheckuser', (err, result) => {
+                if (err) {
+                    console.log(err);
+                } else {
+                    if (result.output.Exist == 1) {
+                        let payload = { subject: req.body._id }
+                        let token = jwt.sign(payload, 'secretKey')
+                        res.status(200).send({ token });
+                    } else {
+                        res.status(401).send('invalid')
+                    }
+                    //res.status(200).send(result);
+                }
+            })
+    }).then((res, err) => {
+        console.dir(result)
+    }).catch(err => {
+        console.log(err);
+    })
+
+})
+
+router.post('/login', (req, res) => {
+    sql.connect(sqlconfig).then(pool => {
+        let connection = sql.connect(sqlconfig, (err) => {
+            if (err) {
+                console.log(err);
+            } else {
+                var request = new sql.Request();
+                request
+                    .input('userEmail', sql.VarChar(50), req.body.userEmail)
+                    .input('userPassword', sql.VarChar(20), req.body.password)
+                    .query('Select * From Appuser Where userEmail=@userEmail AND userPassword=@userPassword', function(er, recordset) {
+                        if (err)
+                            console.log(er);
+                        else {
+                            console.log(recordset)
+                            if (!recordset.recordset[0]) {
+                                res.status(401).send('invalid')
+                            } else {
+                                let payload = { subject: req.body._id }
+                                let token = jwt.sign(payload, 'secretKey')
+
+                                res.status(200).send({
+                                    userId: recordset.recordset[0].userId,
+                                    userEmail: recordset.recordset[0].userEmail,
+                                    RoleId: recordset.recordset[0].RoleId,
+                                    token: token
+                                });
+                            }
+                        }
+                    });
+            }
+        });
+    })
+})
+
+router.post('/logins', (req, res) => {
+    sql.connect(sqlconfig).then(pool => {
+        let connection = sql.connect(sqlconfig, (err) => {
+            if (err) {
+                console.log(err);
+            } else {
+                var request = new sql.Request();
+                request
+                    .input('userEmail', sql.VarChar(50), req.body.userEmail)
+                    .input('userPassword', sql.VarChar(20), req.body.password)
+                    .query('Select * From Appuser Where userEmail=@userEmail AND userPassword=@userPassword', function(er, recordset) {
+                        if (err)
+                            console.log(er);
+                        else {
+                            console.log(recordset)
+                            if (!recordset.recordset[0]) {
+                                res.status(401).send('invalid')
+                            } else {
+                                bcrypt.compare(req.body.password, recordset.recordset[0].userPassword, function(err, result) {
+                                    if (result = true) {
+                                        let payload = { subject: req.body._id }
+                                        let token = jwt.sign(payload, 'secretKey')
+
+                                        res.status(200).send({
+                                            userId: recordset.recordset[0].userId,
+                                            userEmail: recordset.recordset[0].userEmail,
+                                            RoleId: recordset.recordset[0].RoleId,
+                                            token: token
+                                        });
+                                    } else {
+                                        res.status(401).send('invalid')
+                                    }
+                                });
+
+                            }
+                        }
+                    });
+            }
+        });
+    })
+})
+
+
+router.get('/user', function(req, res) {
+
+})
+
+router.post('/register', function(req, res) {
+
     sql.connect(sqlconfig).then(pool => {
 
         return pool.request()
             .input('userEmail', sql.VarChar(30), req.body.userEmail)
+            .input('RoleId', sql.VarChar(10), req.body.userType)
+            .execute('register')
+    }).then(result => {
+        let connection = sql.connect(sqlconfig, (err) => {
+            if (err) {
+                console.log(err);
+            } else {
+                var request = new sql.Request();
+                request
+                    .input('userEmail', sql.VarChar(30), req.body.userEmail)
+                    .query('Select * From Appuser Where userEmail=@userEmail', function(er, recordset) {
+                        if (err)
+                            console.log(er);
+                        else {
+                            console.log(recordset.recordset)
+                            let payload = { subject: req.body._id }
+                            let token = jwt.sign(payload, 'secretKey')
+
+                            res.status(200).send({
+                                userId: recordset.recordset[0].userId,
+                                userEmail: recordset.recordset[0].userEmail,
+                                RoleId: recordset.recordset[0].RoleId,
+                                token: token
+                            });
+                        }
+                    });
+            }
+        });
+    }).catch(err => {
+        console.log(err);
+    })
+})
+
+router.post('/playerregister', function(req, res) {
+    console.log(req.body);
+    var email = req.query.email
+    sql.connect(sqlconfig).then(pool => {
+
+        return pool.request()
+            .input('userEmail', sql.VarChar(30), email)
             .input('playerFName', sql.VarChar(30), req.body.firstNamePlayer)
             .input('playerLName', sql.VarChar(30), req.body.secondNamePlayer)
             .input('playerAddress', sql.VarChar(30), req.body.perAddressPlayer)
             .input('playerteleNum', sql.Int, req.body.teleNoPlayer)
             .input('playerDOB', sql.VarChar(30), req.body.dobpPlayer)
             .input('playerGender', sql.VarChar(10), req.body.MFplayer)
+            .input('instituteId', sql.Int, req.body.PlayerInstitute)
+            .input('strutureId', sql.VarChar(10), req.body.PlayerStructure)
             .execute('playerregister')
     }).then(result => {
         console.dir(req.body)
@@ -1334,6 +2048,31 @@ router.post('/adminregister', function(req, res) {
             .input('instituteName', sql.VarChar(50), req.body.InstituteName)
             .input('instituteLocation', sql.VarChar(50), req.body.InstituteAddress)
             .execute('adiminregister')
+    }).then(result => {
+        console.dir(req.body)
+    }).catch(err => {
+        console.log(err);
+    })
+
+    res.status(200).send({ "message": "Data received" });
+})
+
+router.post('/parentregister', function(req, res) {
+    console.log(req.body);
+
+    var Email = req.get('Email')
+    console.log(Email);
+
+    sql.connect(sqlconfig).then(pool => {
+
+        return pool.request()
+            .input('userEmail', sql.VarChar(50), Email)
+            .input('ParentFName', sql.VarChar(20), req.body.firstNameParent)
+            .input('ParentLName', sql.VarChar(20), req.body.secondNameParent)
+            .input('typeId', sql.VarChar(10), req.body.parentSelect)
+            .input('ParentteleNum', sql.Int, req.body.teleNoParent)
+            .input('ParentAddress', sql.VarChar(100), req.body.AddressParent)
+            .execute('Parentregister')
     }).then(result => {
         console.dir(req.body)
     }).catch(err => {
@@ -1420,6 +2159,53 @@ router.post('/createplayer', function(req, res) {
         console.dir(req.body)
     }).catch(err => {
         console.log(err);
+    })
+
+    res.status(200).send({ "message": "Data received" });
+})
+
+router.get('/getmessages', function(req, res) {
+    sql.connect(sqlconfig).then(pool => {
+        sql.connect(sqlconfig).then(pool => {
+            let connection = sql.connect(sqlconfig, (err) => {
+                if (err) {
+                    console.log(err);
+                } else {
+                    var request = new sql.Request();
+                    request
+                        .query('select * from Groupmessage', function(er, recordset) {
+                            if (err)
+                                console.log(er);
+                            else {
+                                res.send(recordset.recordset);
+                                console.log(recordset.recordset);
+                            }
+                        });
+                }
+            });
+        })
+    })
+
+})
+
+router.post('/sendMessage', function(req, res) {
+
+    sql.connect(sqlconfig).then(pool => {
+        let connection = sql.connect(sqlconfig, (err) => {
+            if (err) {
+                console.log(err);
+            } else {
+                var request = new sql.Request();
+                request
+                    .input('messageContent', sql.VarChar(300), req.body.myMessage)
+                    .input('userName', sql.VarChar(30), req.body.user)
+                    .query('insert into Groupmessage values(@messageContent,@userName)', function(er, recordset) {
+                        if (err)
+                            console.log(er);
+                        else {}
+                    });
+            }
+        });
     })
 
     res.status(200).send({ "message": "Data received" });

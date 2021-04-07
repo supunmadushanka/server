@@ -1759,21 +1759,25 @@ router.post('/tempregister', (req, res) => {
 
 router.post('/tempregisterr', (req, res) => {
 
-    bcrypt.hash(req.body.password, saltRounds, function(err, hash) {
-        sql.connect(sqlconfig).then(pool => {
+    bcrypt.genSalt(10, function(err, salt) {
 
-            return pool.request()
-                .input('userEmail', sql.VarChar(50), req.body.userEmail)
-                .input('userPassword', sql.VarChar(20), hash)
-                .execute('tempregister')
-        }).then(result => {
-            let payload = { subject: req.body._id }
-            let token = jwt.sign(payload, 'secretKey')
-            res.status(200).send({ token });
-            console.dir(result)
-        }).catch(err => {
-            console.log(err);
-        })
+        bcrypt.hash(req.body.password, salt, function(err, hash) {
+            console.log(hash)
+            sql.connect(sqlconfig).then(pool => {
+
+                return pool.request()
+                    .input('userEmail', sql.VarChar(50), req.body.userEmail)
+                    .input('userPassword', sql.VarChar(500), hash)
+                    .execute('tempregister')
+            }).then(result => {
+                let payload = { subject: req.body._id }
+                let token = jwt.sign(payload, 'secretKey')
+                res.status(200).send({ token });
+                console.dir(result)
+            }).catch(err => {
+                console.log(err);
+            })
+        });
     });
 
 })
@@ -1791,17 +1795,11 @@ router.post('/chackemail', (req, respond) => {
 
 router.post('/sendmail', (req, respond) => {
 
-    var email = req.body.userEmail
-
-    let testAccount = nodemailer.createTestAccount();
+    email = req.body.userEmail
 
     var transporter = nodemailer.createTransport({
-        host: 'smtp.gmail.com',
-        secure: true,
+        service: 'gmail',
         auth: {
-            type: "login",
-            port: 587,
-            secure: false,
             user: 'supunmadushanka19980822@gmail.com',
             pass: 'mynameissuperman#'
         }
@@ -1809,16 +1807,17 @@ router.post('/sendmail', (req, respond) => {
 
     var mailOptions = {
         from: 'supunmadushanka19980822@gmail.com',
-        to: 'madushanka.18@itfac.mrt.ac.lk',
+        to: email,
         subject: 'Click to activate acount',
-        html: '<a href="http://localhost:4200/home">localhost:4200/home</a>'
-    };
+        html: '<a href="http://localhost:4200/confirmemail?email=' + email + '">localhost:4200/home</a>'
+    }
 
     transporter.sendMail(mailOptions, function(error, info) {
         if (error) {
             console.log(error);
         } else {
             console.log('Email sent: ' + info.response);
+            res.status(200).send(info);
         }
     });
 })
@@ -1928,8 +1927,8 @@ router.post('/logins', (req, res) => {
                 var request = new sql.Request();
                 request
                     .input('userEmail', sql.VarChar(50), req.body.userEmail)
-                    .input('userPassword', sql.VarChar(20), req.body.password)
-                    .query('Select * From Appuser Where userEmail=@userEmail AND userPassword=@userPassword', function(er, recordset) {
+                    .input('userPassword', sql.VarChar(200), req.body.password)
+                    .query('Select * From Appuser Where userEmail=@userEmail', function(er, recordset) {
                         if (err)
                             console.log(er);
                         else {
@@ -1938,7 +1937,8 @@ router.post('/logins', (req, res) => {
                                 res.status(401).send('invalid')
                             } else {
                                 bcrypt.compare(req.body.password, recordset.recordset[0].userPassword, function(err, result) {
-                                    if (result = true) {
+                                    console.log(result)
+                                    if (result == true) {
                                         let payload = { subject: req.body._id }
                                         let token = jwt.sign(payload, 'secretKey')
 

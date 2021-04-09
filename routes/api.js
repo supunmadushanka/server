@@ -7,6 +7,26 @@ var nodemailer = require('nodemailer');
 const bcrypt = require('bcrypt');
 const saltRounds = 5;
 
+/////////////////////////////////////////////////////////////
+
+const app = express();
+const http = require('http');
+const server = http.Server(app);
+
+const socketIO = require('socket.io');
+const io = socketIO(server);
+
+io.on('connection', (socket) => {
+    console.log('user connected');
+});
+
+io.on('message', (msg) => {
+    console.log('emit works')
+    io.emit(msg);
+});
+
+///////////////////////////////////////////////////////////////
+
 const sql = require('mssql');
 const e = require('express');
 const sqlconfig = {
@@ -1141,7 +1161,7 @@ router.post('/addfixtureplayer', (req, res) => {
                                 .input('fixtureId', sql.Int, fixtureId)
                                 .input('tournamentTeamId', sql.Int, result.output.tournamentTeamId)
                                 .input('userId', sql.Int, userId)
-                                .query('insert into Player_Fixture values(@fixtureId,@userId,null,null,@tournamentTeamId,1,null)', function(er, recordset) {
+                                .query('insert into Player_Fixture values(@fixtureId,@userId,null,null,@tournamentTeamId,1,null,null)', function(er, recordset) {
                                     if (err)
                                         console.log(er);
                                     else {}
@@ -1735,7 +1755,105 @@ router.post('/changeprofilecoach', function(req, res) {
     res.status(200).send({ "message": "Data received" });
 })
 
+//parent
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+router.get('/getparentprofile', function(req, res) {
+
+    var userId = req.query.userId
+
+    sql.connect(sqlconfig).then(pool => {
+        let connection = sql.connect(sqlconfig, (err) => {
+            if (err) {
+                console.log(err);
+            } else {
+                var request = new sql.Request();
+                request
+                    .input('userId', sql.Int, userId)
+                    .query('select * from Parent where userId=@userId', function(er, recordset) {
+                        if (err)
+                            console.log(er);
+                        else {
+                            res.send(recordset.recordset);
+                            console.log(recordset.recordset);
+                        }
+                    });
+            }
+        });
+    })
+})
+
+router.post('/changeprofileparent', function(req, res) {
+
+    var userId = req.query.userId
+    console.log(req.body);
+
+    sql.connect(sqlconfig).then(pool => {
+
+        return pool.request()
+            .input('userId', sql.VarChar(30), userId)
+            .input('parentFName', sql.VarChar(20), req.body.firstNameParent)
+            .input('parentLName', sql.VarChar(20), req.body.secondNameParent)
+            .input('parentAddress', sql.VarChar(100), req.body.AddressParent)
+            .input('ParentteleNum', sql.Int, req.body.teleNoParent)
+            .execute('updateparent')
+    }).then(result => {
+        console.dir(result)
+    }).catch(err => {
+        console.log(err);
+    })
+
+    res.status(200).send({ "message": "Data received" });
+})
+
+router.get('/getparentplayers', function(req, res) {
+
+    var userId = req.query.userId
+
+    sql.connect(sqlconfig).then(pool => {
+        let connection = sql.connect(sqlconfig, (err) => {
+            if (err) {
+                console.log(err);
+            } else {
+                var request = new sql.Request();
+                request
+                    .input('userId', sql.Int, userId)
+                    .query('select * from Player_Parent pp, Player P where pp.playerId=p.userId AND parentId=@userId', function(er, recordset) {
+                        if (err)
+                            console.log(er);
+                        else {
+                            res.send(recordset.recordset);
+                            console.log(recordset.recordset);
+                        }
+                    });
+            }
+        });
+    })
+})
+
+router.post('/confirmavailability', function(req, res) {
+
+    var userId = req.query.userId
+    var fixtureId = req.query.fixtureId
+    var tournamentTeamId = req.query.tournamentTeamId
+
+    sql.connect(sqlconfig).then(pool => {
+
+        return pool.request()
+            .input('fixtureId', sql.Int, fixtureId)
+            .input('playerID', sql.Int, userId)
+            .input('tournamentTeamId', sql.Int, tournamentTeamId)
+            .execute('confirmavailability')
+    }).then(result => {
+        console.dir(req.body)
+    }).catch(err => {
+        console.log(err);
+    })
+
+    res.status(200).send({ "message": "Data received" });
+})
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 router.post('/tempregister', (req, res) => {
 

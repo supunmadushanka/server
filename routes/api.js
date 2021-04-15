@@ -3,32 +3,12 @@ const router = express.Router();
 const jwt = require('jsonwebtoken');
 const emailExistence = require('email-existence');
 var nodemailer = require('nodemailer');
-
 const bcrypt = require('bcrypt');
 const saltRounds = 5;
-
-/////////////////////////////////////////////////////////////
-
 const app = express();
-const http = require('http');
-const server = http.Server(app);
-
-const socketIO = require('socket.io');
-const io = socketIO(server);
-
-io.on('connection', (socket) => {
-    console.log('user connected');
-});
-
-io.on('message', (msg) => {
-    console.log('emit works')
-    io.emit(msg);
-});
-
-///////////////////////////////////////////////////////////////
 
 const sql = require('mssql');
-const e = require('express');
+
 const sqlconfig = {
     user: 'sa',
     password: '123',
@@ -61,13 +41,6 @@ router.get('/', (req, res) => {
     res.send('from API route')
 })
 
-//Ctrl+K+C
-//Ctrl+K+U
-
-
-
-//Admin
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 router.get('/teams', function(req, res) {
 
     var Email = req.get('Email')
@@ -90,7 +63,7 @@ router.get('/teams', function(req, res) {
                             var request = new sql.Request();
                             request
                                 .input('institute', sql.Int, result.output.Exist)
-                                .query('select * from getteamview1 where instituteId=@institute', function(er, recordset) {
+                                .query('select * from getteamview1 where instituteId=@institute order by teamName', function(er, recordset) {
                                     if (err)
                                         console.log(er);
                                     else {
@@ -127,7 +100,7 @@ router.get('/coaches', function(req, res) {
                             var request = new sql.Request();
                             request
                                 .input('institute', sql.Int, result.output.Exist)
-                                .query('select * from getcoachview1 where instituteId=@institute', function(er, recordset) {
+                                .query('select * from getcoachview1 where instituteId=@institute order by coachFName', function(er, recordset) {
                                     if (err)
                                         console.log(er);
                                     else {
@@ -163,7 +136,7 @@ router.get('/players', function(req, res) {
                             var request = new sql.Request();
                             request
                                 .input('institute', sql.Int, result.output.Exist)
-                                .query('select * from playerview where instituteId=@institute', function(er, recordset) {
+                                .query('select * from playerview where instituteId=@institute order by playerFName', function(er, recordset) {
                                     if (err)
                                         console.log(er);
                                     else {
@@ -263,7 +236,7 @@ router.get('/teamplayers', function(req, res) {
                 var request = new sql.Request();
                 request
                     .input('teamId', sql.Int, teamId)
-                    .query('select * from Player p, Team_Player tp where p.userId = tp.playerId and tp.teamId=@teamId', function(er, recordset) {
+                    .query('select * from Player p, Team_Player tp where p.userId = tp.playerId and tp.teamId=@teamId order by playerFName', function(er, recordset) {
                         if (err)
                             console.log(er);
                         else {
@@ -328,7 +301,6 @@ router.get('/teamachieve', function(req, res) {
         });
     })
 })
-
 
 router.post('/addachieve', function(req, res) {
 
@@ -395,7 +367,6 @@ router.get('/addplayerview', function(req, res) {
 
 })
 
-
 router.post('/addplayer', function(req, res) {
 
     var Email = req.get('Email')
@@ -450,7 +421,6 @@ router.post('/removeplayer', function(req, res) {
     res.status(200).send({ "message": "Data received" });
 })
 
-
 router.post('/createtournament', function(req, res) {
 
     var Email = req.get('Email')
@@ -460,7 +430,7 @@ router.post('/createtournament', function(req, res) {
 
         return pool.request()
             .input('userEmail', sql.VarChar(50), Email)
-            .input('tournamentName', sql.VarChar(30), req.body.TournamentName)
+            .input('tournamentName', sql.VarChar(100), req.body.TournamentName)
             .input('sportId', sql.VarChar(10), req.body.Sport)
             .input('under15male', sql.VarChar(5), req.body.under15male)
             .input('under15female', sql.VarChar(5), req.body.under15female)
@@ -500,7 +470,7 @@ router.get('/getcreatedtournament', function(req, res) {
                             var request = new sql.Request();
                             request
                                 .input('institute', sql.Int, result.output.Exist)
-                                .query('select * from Tournament_Institute ti, Tournament t, Sport s where t.tournementId=ti.tournementId AND t.sportId=s.sportId AND ti.instituteId=@institute AND tournamentstatus is null', function(er, recordset) {
+                                .query('select * from Tournament_Institute ti, Tournament t, Sport s where t.tournementId=ti.tournementId and t.sportId=s.sportId and ti.instituteId=@institute and tournamentstatus is null', function(er, recordset) {
                                     if (err)
                                         console.log(er);
                                     else {
@@ -846,7 +816,7 @@ router.get('/getfixtureteamplayers', function(req, res) {
                 request
                     .input('fixtureId', sql.Int, fixtureId)
                     .input('tournamentTeamId', sql.Int, tournamentTeamId)
-                    .query('select * from Player_Fixture pf,Tournament_Team tt,Player p where pf.tournamentTeamId=tt.tournamentTeamId AND p.userId=pf.playerId AND tt.tournamentTeamId=@tournamentTeamId AND pf.fixtureId=@fixtureId', function(er, recordset) {
+                    .query('select * from Player_Fixture pf,Tournament_Team tt,Player p where pf.tournamentTeamId=tt.tournamentTeamId AND p.userId=pf.playerId AND tt.tournamentTeamId=@tournamentTeamId AND pf.fixtureId=@fixtureId order by PFid', function(er, recordset) {
                         if (err)
                             console.log(er);
                         else {
@@ -858,7 +828,6 @@ router.get('/getfixtureteamplayers', function(req, res) {
         });
     })
 })
-
 
 router.get('/getaddfixtureplayers', function(req, res) {
 
@@ -1243,7 +1212,6 @@ router.post('/startfixture', (req, res) => {
 router.post('/postponefixture', (req, res) => {
 
     var fixtureId = req.query.fixtureId
-    console.log('my fixture is :' + fixtureId)
 
     sql.connect(sqlconfig).then(pool => {
 
@@ -1256,6 +1224,20 @@ router.post('/postponefixture', (req, res) => {
         console.log(err);
     })
 
+    res.status(200).send({ "message": "Data received" });
+})
+
+router.post('/deletefixture', (req, res) => {
+    var fixtureId = req.query.fixtureId
+    sql.connect(sqlconfig).then(pool => {
+        return pool.request()
+            .input('fixtureId', sql.Int, fixtureId)
+            .execute('deletefixture')
+    }).then(result => {
+        console.dir(req.body)
+    }).catch(err => {
+        console.log(err);
+    })
     res.status(200).send({ "message": "Data received" });
 })
 
@@ -1403,8 +1385,6 @@ router.post('/registerfixture', function(req, res) {
     res.status(200).send({ "message": "Data received" });
 })
 
-//Player
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 router.get('/getplayerId', function(req, res) {
 
     var Email = req.get('Email')
@@ -1678,10 +1658,6 @@ router.post('/changeavailability', function(req, res) {
     res.status(200).send({ "message": "Data received" });
 })
 
-
-//coach
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 router.get('/getcoachprofile', function(req, res) {
 
     var userId = req.query.userId
@@ -1754,9 +1730,6 @@ router.post('/changeprofilecoach', function(req, res) {
 
     res.status(200).send({ "message": "Data received" });
 })
-
-//parent
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 router.get('/getparentprofile', function(req, res) {
 
@@ -1852,8 +1825,6 @@ router.post('/confirmavailability', function(req, res) {
 
     res.status(200).send({ "message": "Data received" });
 })
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 router.post('/tempregister', (req, res) => {
 
@@ -2078,7 +2049,6 @@ router.post('/logins', (req, res) => {
         });
     })
 })
-
 
 router.get('/user', function(req, res) {
 

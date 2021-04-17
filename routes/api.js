@@ -6,8 +6,37 @@ var nodemailer = require('nodemailer');
 const bcrypt = require('bcrypt');
 const saltRounds = 5;
 const app = express();
-
 const sql = require('mssql');
+var PORT = 3000;
+
+const http = require('http').createServer(app);
+const io = require('socket.io')(http, {
+    cors: {
+        origins: ['http://localhost:4200']
+    }
+});
+
+app.get('/', (req, res) => {
+    res.send('<h1>Hey Socket.io</h1>');
+});
+
+http.listen(3001, () => {
+    console.log('listening on *:3001');
+});
+
+io.on('connection', (socket) => {
+    console.log('a user connected');
+    socket.on('disconnect', () => {
+        console.log('user disconnected');
+    });
+    socket.on('my message', (msg) => {
+        console.log('message: ' + msg);
+        io.emit('my broadcast', msg);
+    });
+});
+
+
+
 
 const sqlconfig = {
     user: 'sa',
@@ -351,7 +380,7 @@ router.get('/addplayerview', function(req, res) {
                                     .input('teamId', sql.Int, teamId)
                                     .input('structureId', sql.VarChar(10), result.output.strutureId)
                                     .input('instituteId', sql.Int, result.output.instituteId)
-                                    .query('select * from addplayerview where strutureId=@structureId AND (teamId!=@teamId or teamId IS Null) AND instituteId=@instituteId', function(er, recordset) {
+                                    .query('select * from addplayerview a where strutureId=@structureId AND teamId!=@teamId AND instituteId=@instituteId AND not exists (select * from Team_Player tp where teamId=@teamId AND a.userId=tp.playerId)', function(er, recordset) {
                                         if (err)
                                             console.log(er);
                                         else {
@@ -939,6 +968,34 @@ router.get('/getTotal', function(req, res) {
     })
 })
 
+router.get('/getWickets', function(req, res) {
+
+    var fixtureId = req.query.fixtureId
+    var tournamentTeamId = req.query.tournamentTeamId
+
+    sql.connect(sqlconfig).then(pool => {
+        let connection = sql.connect(sqlconfig, (err) => {
+            if (err) {
+                console.log(err);
+            } else {
+                var request = new sql.Request();
+                request
+                    .input('fixtureId', sql.Int, fixtureId)
+                    .input('tournamentTeamId', sql.Int, tournamentTeamId)
+                    .input('out', sql.VarChar(10), 'out')
+                    .query('select count(outnotout) as wickets from Player_Fixture where fixtureId=@fixtureId AND tournamentTeamId=@tournamentTeamId AND outnotout=@out', function(er, recordset) {
+                        if (err)
+                            console.log(er);
+                        else {
+                            res.send(recordset.recordset);
+                            console.log(recordset.recordset);
+                        }
+                    });
+            }
+        });
+    })
+})
+
 router.get('/getsummery', function(req, res) {
 
     var tournamentId = req.query.tournamentId
@@ -1130,7 +1187,8 @@ router.post('/addfixtureplayer', (req, res) => {
                                 .input('fixtureId', sql.Int, fixtureId)
                                 .input('tournamentTeamId', sql.Int, result.output.tournamentTeamId)
                                 .input('userId', sql.Int, userId)
-                                .query('insert into Player_Fixture values(@fixtureId,@userId,null,null,@tournamentTeamId,1,null,null)', function(er, recordset) {
+                                .input('notout', sql.VarChar(10), 'notout')
+                                .query('insert into Player_Fixture(fixtureId,playerID,playerPoints,playerScore,tournamentTeamId,fixtureAvaial,AvaialReason,Confirm,overs,givescore,wickets,outnotout) values(@fixtureId,@userId,null,null,@tournamentTeamId,1,null,null,null,null,null,@notout)', function(er, recordset) {
                                     if (err)
                                         console.log(er);
                                     else {}
@@ -1200,6 +1258,28 @@ router.post('/startfixture', (req, res) => {
         return pool.request()
             .input('fixtureId', sql.Int, fixtureId)
             .execute('startfixture')
+    }).then(result => {
+        console.dir(req.body)
+    }).catch(err => {
+        console.log(err);
+    })
+
+    res.status(200).send({ "message": "Data received" });
+})
+
+router.post('/updatedescript', (req, res) => {
+
+    var description = req.query.description
+    var fixtureId = req.query.fixtureId
+    var tournamentTeamId = req.query.tournamentTeamId
+
+    sql.connect(sqlconfig).then(pool => {
+
+        return pool.request()
+            .input('description', sql.VarChar(1000), description)
+            .input('fixtureId', sql.Int, fixtureId)
+            .input('tournamentTeamId', sql.Int, tournamentTeamId)
+            .execute('updatedescript')
     }).then(result => {
         console.dir(req.body)
     }).catch(err => {
@@ -1336,20 +1416,46 @@ router.post('/finishtournament', function(req, res) {
 
 router.post('/addplayerscore', function(req, res) {
 
-    var Email = req.get('Email')
     var fixtureId = req.query.fixtureId
     var playerId = req.query.currentUserId
     var tournamentTeamId = req.query.tournamentTeamId
-    var score = req.query.score
+
+    console.log(req.body);
 
     sql.connect(sqlconfig).then(pool => {
 
         return pool.request()
             .input('fixtureId', sql.Int, fixtureId)
             .input('playerID', sql.Int, playerId)
-            .input('playerScore', sql.Int, score)
+            .input('playerScore', sql.Int, req.body.playerScore)
+            .input('overs', sql.Float, req.body.overs)
+            .input('givescore', sql.Int, req.body.givescore)
+            .input('wickets', sql.Int, req.body.wickets)
+            .input('outnotout', sql.VarChar(10), req.body.status)
             .input('tournamentTeamId', sql.Int, tournamentTeamId)
             .execute('addplayerscore')
+    }).then(result => {
+        console.dir(req.body)
+    }).catch(err => {
+        console.log(err);
+    })
+
+    res.status(200).send({ "message": "Data received" });
+})
+
+router.post('/updateextra', function(req, res) {
+
+    var fixtureId = req.query.fixtureId
+    var extras = req.query.extras
+    var tournamentTeamId = req.query.tournamentTeamId
+
+    sql.connect(sqlconfig).then(pool => {
+
+        return pool.request()
+            .input('fixtureId', sql.Int, fixtureId)
+            .input('extras', sql.Int, extras)
+            .input('tournamentTeamId', sql.Int, tournamentTeamId)
+            .execute('addeextra')
     }).then(result => {
         console.dir(req.body)
     }).catch(err => {
@@ -1385,6 +1491,77 @@ router.post('/registerfixture', function(req, res) {
     res.status(200).send({ "message": "Data received" });
 })
 
+router.post('/savemessage', function(req, res) {
+
+    sql.connect(sqlconfig).then(pool => {
+
+        return pool.request()
+            .input('messageContent', sql.VarChar(500), req.body.messageContent)
+            .input('messageDateTime', sql.VarChar(30), req.body.messageDateTime)
+            .input('teamId', sql.Int, req.body.teamId)
+            .input('userId', sql.Int, req.body.userId)
+            .input('userName', sql.VarChar(30), req.body.userName)
+            .input('RoleId', sql.VarChar(10), req.body.RoleId)
+            .execute('savemessage')
+    }).then(result => {
+        console.dir(req.body)
+    }).catch(err => {
+        console.log(err);
+    })
+
+    res.status(200).send({ "message": "Data received" });
+})
+
+router.get('/getmessages', function(req, res) {
+
+    var teamId = req.query.teamId
+
+    sql.connect(sqlconfig).then(pool => {
+        let connection = sql.connect(sqlconfig, (err) => {
+            if (err) {
+                console.log(err);
+            } else {
+                var request = new sql.Request();
+                request
+                    .input('teamId', sql.Int, teamId)
+                    .query('select * from Group_Message where teamId=@teamId', function(er, recordset) {
+                        if (err)
+                            console.log(er);
+                        else {
+                            res.send(recordset.recordset);
+                            console.log(recordset.recordset);
+                        }
+                    });
+            }
+        });
+    })
+})
+
+router.get('/getstructures', function(req, res) {
+
+    var tournementId = req.query.tournementId
+
+    sql.connect(sqlconfig).then(pool => {
+        let connection = sql.connect(sqlconfig, (err) => {
+            if (err) {
+                console.log(err);
+            } else {
+                var request = new sql.Request();
+                request
+                    .input('tournementId', sql.Int, tournementId)
+                    .query('select * from Tournament t,Tournament_Structure st, Struture s where t.tournementId=st.tournementId and st.strutureId=s.strutureId AND t.tournementId=@tournementId', function(er, recordset) {
+                        if (err)
+                            console.log(er);
+                        else {
+                            res.send(recordset.recordset);
+                            console.log(recordset.recordset);
+                        }
+                    });
+            }
+        });
+    })
+})
+
 router.get('/getplayerId', function(req, res) {
 
     var Email = req.get('Email')
@@ -1408,6 +1585,41 @@ router.get('/getplayerId', function(req, res) {
             }
         });
     })
+})
+
+router.get('/getinstituteid', function(req, res) {
+
+    var userEmail = req.query.userEmail
+
+    sql.connect(sqlconfig).then(pool => {
+
+        return pool.request()
+            .input('userEmail', sql.VarChar(50), userEmail)
+            .output('Exist', sql.Int)
+            .execute('getinstituteid', (err, result) => {
+                if (err) {
+                    console.log(err);
+                } else {
+                    console.log(result);
+                    let connection = sql.connect(sqlconfig, (err) => {
+                        if (err) {
+                            console.log(err);
+                        } else {
+                            var request = new sql.Request();
+                            request
+                                .input('instituteId', sql.Int, result.output.Exist)
+                                .query('select * from institute where instituteId=@instituteId', function(er, recordset) {
+                                    if (err)
+                                        console.log(er);
+                                    else {
+                                        res.send(recordset.recordset);
+                                    }
+                                });
+                        }
+                    });
+                }
+            })
+    }).then((result) => {}).catch(err => {})
 })
 
 router.get('/playerteams', function(req, res) {
@@ -2050,7 +2262,72 @@ router.post('/logins', (req, res) => {
     })
 })
 
-router.get('/user', function(req, res) {
+router.get('/getuserinfo', function(req, res) {
+
+    var userId = req.query.userId
+    var RoleId = req.query.RoleId
+
+    if (RoleId == 'ur0001') {
+        sql.connect(sqlconfig).then(pool => {
+            let connection = sql.connect(sqlconfig, (err) => {
+                if (err) {
+                    console.log(err);
+                } else {
+                    var request = new sql.Request();
+                    request
+                        .input('userId', sql.Int, userId)
+                        .query('select * from Instituteadmin where userId=@userId', function(er, recordset) {
+                            if (err)
+                                console.log(er);
+                            else {
+                                res.send(recordset.recordset);
+                                console.log(recordset.recordset);
+                            }
+                        });
+                }
+            });
+        })
+    } else if (RoleId == 'ur0002') {
+        sql.connect(sqlconfig).then(pool => {
+            let connection = sql.connect(sqlconfig, (err) => {
+                if (err) {
+                    console.log(err);
+                } else {
+                    var request = new sql.Request();
+                    request
+                        .input('userId', sql.Int, userId)
+                        .query('select * from Player where userId=@userId', function(er, recordset) {
+                            if (err)
+                                console.log(er);
+                            else {
+                                res.send(recordset.recordset);
+                                console.log(recordset.recordset);
+                            }
+                        });
+                }
+            });
+        })
+    } else if (RoleId == 'ur0004') {
+        sql.connect(sqlconfig).then(pool => {
+            let connection = sql.connect(sqlconfig, (err) => {
+                if (err) {
+                    console.log(err);
+                } else {
+                    var request = new sql.Request();
+                    request
+                        .input('userId', sql.Int, userId)
+                        .query('select * from Coach where userId=@userId', function(er, recordset) {
+                            if (err)
+                                console.log(er);
+                            else {
+                                res.send(recordset.recordset);
+                                console.log(recordset.recordset);
+                            }
+                        });
+                }
+            });
+        })
+    }
 
 })
 

@@ -192,7 +192,7 @@ router.get('/sports', verifyToken, function(req, res) {
     }).then((result) => {}).catch(err => {})
 })
 
-router.get('/structure', verifyToken, function(req, res) {
+router.get('/structure', function(req, res) {
     var Email = req.get('Email')
     sql.connect(sqlconfig).then(pool => {
         return pool.request()
@@ -333,7 +333,7 @@ router.get('/addplayerview', verifyToken, function(req, res) {
                                     .input('teamId', sql.Int, teamId)
                                     .input('structureId', sql.VarChar(10), result.output.strutureId)
                                     .input('instituteId', sql.Int, result.output.instituteId)
-                                    .query('select * from addplayerview a where strutureId=@structureId AND not exists (select * from Team_Player tp where teamId=@teamId AND a.userId=tp.playerId)', function(er, recordset) {
+                                    .query('select * from addplayerview a where strutureId=@structureId AND not exists (select * from Team_Player tp where teamId=@teamId AND a.userId=tp.playerId) AND a.instituteId=@instituteId', function(er, recordset) {
                                         if (err)
                                             console.log(er);
                                         else {
@@ -529,7 +529,7 @@ router.get('/getnewtournament', verifyToken, function(req, res) {
                             var request = new sql.Request();
                             request
                                 .input('institute', sql.Int, result.output.Exist)
-                                .query('select * from Tournament t,Sport s where not exists( select * from Tournament_Institute ti where instituteId=@institute AND ti.tournementId=t.tournementId) AND t.sportId=s.sportId', function(er, recordset) {
+                                .query('select * from Tournament t,Sport s where not exists( select * from Tournament_Institute ti where instituteId=@institute AND ti.tournementId=t.tournementId) AND t.sportId=s.sportId AND t.tournamentstatus is null', function(er, recordset) {
                                     if (err)
                                         console.log(er);
                                     else {
@@ -844,7 +844,51 @@ router.get('/getsummery', verifyToken, function(req, res) {
                 var request = new sql.Request();
                 request
                     .input('tournamentId', sql.Int, tournamentId)
-                    .query('select * from tournamentsummery where tournementId=@tournamentId', function(er, recordset) {
+                    .query('select * from tournamentsummery where tournementId=@tournamentId ORDER BY point DESC', function(er, recordset) {
+                        if (err)
+                            console.log(er);
+                        else {
+                            res.send(recordset.recordset);
+                        }
+                    });
+            }
+        });
+    })
+})
+
+router.get('/getpointtable', verifyToken, function(req, res) {
+    var tournamentId = req.query.tournamentId
+    sql.connect(sqlconfig).then(pool => {
+        let connection = sql.connect(sqlconfig, (err) => {
+            if (err) {
+                console.log(err);
+            } else {
+                var request = new sql.Request();
+                request
+                    .input('tournamentId', sql.Int, tournamentId)
+                    .query('select * from pointtable where tournementId=@tournamentId ORDER BY sumpoint DESC', function(er, recordset) {
+                        if (err)
+                            console.log(er);
+                        else {
+                            res.send(recordset.recordset);
+                        }
+                    });
+            }
+        });
+    })
+})
+
+router.get('/getaddedinstitutes', verifyToken, function(req, res) {
+    var tournamentId = req.query.tournamentId
+    sql.connect(sqlconfig).then(pool => {
+        let connection = sql.connect(sqlconfig, (err) => {
+            if (err) {
+                console.log(err);
+            } else {
+                var request = new sql.Request();
+                request
+                    .input('tournamentId', sql.Int, tournamentId)
+                    .query('select * from Tournament_Institute ti,institute i where ti.tournementId=@tournamentId AND ti.instituteId=i.instituteId', function(er, recordset) {
                         if (err)
                             console.log(er);
                         else {
@@ -935,7 +979,7 @@ router.get('/getinstituteplayercount', verifyToken, function(req, res) {
                             var request = new sql.Request();
                             request
                                 .input('institute', sql.Int, result.output.Exist)
-                                .query('select count(playerId) as noOfPlayers from Team_Player tp,Team t where tp.teamId=t.teamId AND instituteId=@institute', function(er, recordset) {
+                                .query('select count(userId) as noOfPlayers from Player where instituteId=@institute', function(er, recordset) {
                                     if (err)
                                         console.log(er);
                                     else {
@@ -1003,8 +1047,7 @@ router.post('/addfixtureplayer', verifyToken, (req, res) => {
                                 .input('fixtureId', sql.Int, fixtureId)
                                 .input('tournamentTeamId', sql.Int, result.output.tournamentTeamId)
                                 .input('userId', sql.Int, userId)
-                                .input('notout', sql.VarChar(10), 'notout')
-                                .query('insert into Player_Fixture(fixtureId,playerID,playerPoints,playerScore,tournamentTeamId,fixtureAvaial,AvaialReason,Confirm,overs,givescore,wickets,outnotout) values(@fixtureId,@userId,null,null,@tournamentTeamId,1,null,null,null,null,null,@notout)', function(er, recordset) {
+                                .query('insert into Player_Fixture(fixtureId,playerID,playerPoints,playerScore,tournamentTeamId,fixtureAvaial,AvaialReason,Confirm,overs,givescore,wickets,outnotout) values(@fixtureId,@userId,null,null,@tournamentTeamId,1,null,null,null,null,null,null)', function(er, recordset) {
                                     if (err)
                                         console.log(er);
                                     else {}
@@ -1240,6 +1283,44 @@ router.post('/editfixture', verifyToken, function(req, res) {
     res.status(200).send({ "message": "Data received" });
 })
 
+router.get('/getadminprofile', verifyToken, function(req, res) {
+    var userId = req.query.userId
+    sql.connect(sqlconfig).then(pool => {
+        let connection = sql.connect(sqlconfig, (err) => {
+            if (err) {
+                console.log(err);
+            } else {
+                var request = new sql.Request();
+                request
+                    .input('userId', sql.Int, userId)
+                    .query('select * from Instituteadmin where userId=@userId', function(er, recordset) {
+                        if (err)
+                            console.log(er);
+                        else {
+                            res.send(recordset.recordset);
+                        }
+                    });
+            }
+        });
+    })
+})
+
+router.post('/editadminprofile', verifyToken, function(req, res) {
+    var userId = req.query.userId
+    sql.connect(sqlconfig).then(pool => {
+        return pool.request()
+            .input('userID', sql.VarChar(50), userId)
+            .input('adminFName', sql.VarChar(20), req.body.firstNameAdmin)
+            .input('adminLName', sql.VarChar(20), req.body.lastNameAdmin)
+            .input('adminAddress', sql.VarChar(100), req.body.addressAdmin)
+            .input('adminTeliNo', sql.Int, req.body.teleNoAdmin)
+            .execute('editadminprofile')
+    }).then(result => {}).catch(err => {
+        console.log(err);
+    })
+    res.status(200).send({ "message": "Data received" });
+})
+
 router.post('/savemessage', verifyToken, function(req, res) {
     sql.connect(sqlconfig).then(pool => {
         return pool.request()
@@ -1290,6 +1371,28 @@ router.get('/getstructures', verifyToken, function(req, res) {
                 request
                     .input('tournementId', sql.Int, tournementId)
                     .query('select * from Tournament t,Tournament_Structure st, Struture s where t.tournementId=st.tournementId and st.strutureId=s.strutureId AND t.tournementId=@tournementId', function(er, recordset) {
+                        if (err)
+                            console.log(er);
+                        else {
+                            res.send(recordset.recordset);
+                        }
+                    });
+            }
+        });
+    })
+})
+
+router.get('/gettourstructures', verifyToken, function(req, res) {
+    var tournementId = req.query.tournamentId
+    sql.connect(sqlconfig).then(pool => {
+        let connection = sql.connect(sqlconfig, (err) => {
+            if (err) {
+                console.log(err);
+            } else {
+                var request = new sql.Request();
+                request
+                    .input('tournementId', sql.Int, tournementId)
+                    .query('select * from Tournament_Structure ts,Struture s where tournementId=@tournementId AND s.strutureId=ts.strutureId', function(er, recordset) {
                         if (err)
                             console.log(er);
                         else {
@@ -1451,7 +1554,7 @@ router.post('/changeprofileplayer', verifyToken, function(req, res) {
     res.status(200).send({ "message": "Data received" });
 })
 
-router.post('/changePassword', verifyToken, function(req, res) {
+router.post('/changePasswordd', verifyToken, function(req, res) {
     var userId = req.query.userId
     sql.connect(sqlconfig).then(pool => {
         return pool.request()
@@ -1464,7 +1567,7 @@ router.post('/changePassword', verifyToken, function(req, res) {
     res.status(200).send({ "message": "Data received" });
 })
 
-router.post('/changePasswordd', verifyToken, function(req, res) {
+router.post('/changePassword', verifyToken, function(req, res) {
     var userId = req.query.userId
     bcrypt.genSalt(10, function(err, salt) {
         bcrypt.hash(req.body.password, salt, function(err, hash) {
@@ -1480,7 +1583,6 @@ router.post('/changePasswordd', verifyToken, function(req, res) {
     });
     res.status(200).send({ "message": "Data received" });
 })
-
 
 router.post('/addachievplayer', verifyToken, function(req, res) {
     var userId = req.query.userId
@@ -1524,6 +1626,19 @@ router.delete("/deleteplayerstrength/:strengthId", verifyToken, function(req, re
         return pool.request()
             .input('strengthId', sql.Int, req.params.strengthId)
             .execute('deleteplayerstrength')
+    }).then(result => {}).catch(err => {
+        console.log(err);
+    })
+    res.status(200).send({ "message": "Data received" });
+});
+
+router.delete("/removeinstitute/:instituteId/:tournamentId", verifyToken, function(req, res) {
+    console.log(req.params.instituteId + " " + req.params.tournamentId)
+    sql.connect(sqlconfig).then(pool => {
+        return pool.request()
+            .input('instituteId', sql.Int, req.params.instituteId)
+            .input('tournementId', sql.Int, req.params.tournamentId)
+            .execute('removeinstitute')
     }).then(result => {}).catch(err => {
         console.log(err);
     })
@@ -1620,7 +1735,7 @@ router.get('/getplayerweaknesses', verifyToken, function(req, res) {
     })
 })
 
-router.get('/institutes', verifyToken, function(req, res) {
+router.get('/institutes', function(req, res) {
     sql.connect(sqlconfig).then(pool => {
         let connection = sql.connect(sqlconfig, (err) => {
             if (err) {
@@ -1896,7 +2011,7 @@ router.post('/confirmavailability', verifyToken, function(req, res) {
 })
 
 
-router.post('/tempregister', (req, res) => {
+router.post('/tempregisterr', (req, res) => {
     sql.connect(sqlconfig).then(pool => {
         return pool.request()
             .input('userEmail', sql.VarChar(50), req.body.userEmail)
@@ -1911,7 +2026,7 @@ router.post('/tempregister', (req, res) => {
     })
 })
 
-router.post('/tempregisterr', (req, res) => {
+router.post('/tempregister', (req, res) => {
     bcrypt.genSalt(10, function(err, salt) {
         bcrypt.hash(req.body.password, salt, function(err, hash) {
             sql.connect(sqlconfig).then(pool => {

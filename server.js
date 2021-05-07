@@ -1,21 +1,12 @@
-function requireHTTPS(req, res, next) {
-    // The 'x-forwarded-proto' check is for Heroku
-    if (!req.secure && req.get('x-forwarded-proto') !== 'https') {
-        return res.redirect('https://' + req.get('host') + req.url);
-    }
-    next();
-}
-
 const express = require('express');
 const bodyParser = require('body-parser');
 const cors = require('cors');
 const sql = require('mssql');
-var PORT = process.env.PORT || 3000
+var PORT = process.env.PORT || 8080
 const api = require('./routes/api');
 const app = express();
 app.use(bodyParser.json());
 app.use(cors());
-app.use(requireHTTPS);
 
 const sqlconfig = {
     user: 'sa',

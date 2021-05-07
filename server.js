@@ -2,7 +2,7 @@ const express = require('express');
 const bodyParser = require('body-parser');
 const cors = require('cors');
 const sql = require('mssql');
-var PORT = process.env.PORT || 8080
+var PORT = process.env.PORT || 3000
 const api = require('./routes/api');
 const app = express();
 app.use(bodyParser.json());

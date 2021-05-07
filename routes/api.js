@@ -1547,6 +1547,7 @@ router.post('/changeprofileplayer', verifyToken, function(req, res) {
             .input('playerWeight', sql.Int, req.body.weightPlayer)
             .input('playerHeight', sql.Int, req.body.heightPlayer)
             .input('playerBloodGroup', sql.VarChar(3), req.body.bloodSelect)
+            .input('strutureId', sql.VarChar(10), req.body.PlayerStructure)
             .execute('updateplayer')
     }).then(result => {}).catch(err => {
         console.log(err);
@@ -1663,6 +1664,17 @@ router.delete("/deleteplayerweakness/:weaknessesId", verifyToken, function(req, 
         return pool.request()
             .input('weaknessesId', sql.Int, req.params.weaknessesId)
             .execute('deleteplayerweakness')
+    }).then(result => {}).catch(err => {
+        console.log(err);
+    })
+    res.status(200).send({ "message": "Data received" });
+});
+
+router.delete("/deleteplayer/:userId", verifyToken, function(req, res) {
+    sql.connect(sqlconfig).then(pool => {
+        return pool.request()
+            .input('userId', sql.Int, req.params.userId)
+            .execute('deleteplayer')
     }).then(result => {}).catch(err => {
         console.log(err);
     })
@@ -1837,6 +1849,17 @@ router.post('/changeavailability', verifyToken, function(req, res) {
     })
     res.status(200).send({ "message": "Data received" });
 })
+
+router.delete("/deletecoach/:userId", verifyToken, function(req, res) {
+    sql.connect(sqlconfig).then(pool => {
+        return pool.request()
+            .input('userId', sql.Int, req.params.userId)
+            .execute('deletecoach')
+    }).then(result => {}).catch(err => {
+        console.log(err);
+    })
+    res.status(200).send({ "message": "Data received" });
+});
 
 router.get('/getcoachprofile', verifyToken, function(req, res) {
     var userId = req.query.userId
@@ -2139,7 +2162,7 @@ router.post('/loginn', (req, res) => {
 
 })
 
-router.post('/login', (req, res) => {
+router.post('/logins', (req, res) => {
     sql.connect(sqlconfig).then(pool => {
         let connection = sql.connect(sqlconfig, (err) => {
             if (err) {
@@ -2174,7 +2197,7 @@ router.post('/login', (req, res) => {
     })
 })
 
-router.post('/logins', (req, res) => {
+router.post('/login', (req, res) => {
     sql.connect(sqlconfig).then(pool => {
         let connection = sql.connect(sqlconfig, (err) => {
             if (err) {
@@ -2589,6 +2612,60 @@ router.post('/sendMessage', verifyToken, function(req, res) {
         });
     })
     res.status(200).send({ "message": "Data received" });
+})
+
+router.post('/sendreview', function(req, res) {
+
+    var transporter = nodemailer.createTransport({
+        service: 'gmail',
+        auth: {
+            user: 'supunmadushanka19980822@gmail.com',
+            pass: 'mynameissuperman#'
+        }
+    });
+
+    var mailOptions = {
+        from: 'supunmadushanka19980822@gmail.com',
+        to: 'supunmadushanka19980822@gmail.com',
+        subject: req.body.email + ' - ' + req.body.FullName,
+        text: req.body.message
+    }
+
+    transporter.sendMail(mailOptions, function(error, info) {
+        if (error) {
+            console.log(error);
+        } else {
+            console.log('Email sent: ' + info.response);
+            res.status(200).send(info);
+        }
+    });
+})
+
+router.post('/test', function(req, res) {
+
+    var transporter = nodemailer.createTransport({
+        service: 'gmail',
+        auth: {
+            user: 'supunmadushanka19980822@gmail.com',
+            pass: 'mynameissuperman#'
+        }
+    });
+
+    var mailOptions = {
+        from: 'supunmadushanka19980822@gmail.com',
+        to: 'supunmadushanka19980822@gmail.com',
+        subject: req.body.email + ' - ' + req.body.FullName,
+        text: req.body.message
+    }
+
+    transporter.sendMail(mailOptions, function(error, info) {
+        if (error) {
+            console.log(error);
+        } else {
+            console.log('Email sent: ' + info.response);
+            res.status(200).send(info);
+        }
+    });
 })
 
 module.exports = router

@@ -2663,6 +2663,8 @@ router.post('/test', function(req, res) {
             console.log(error);
         } else {
             console.log('Email sent: ' + info.response);
+            response.setHeader('Access-Control-Allow-Origin', '*')
+            response.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS,DELETE,PUT')
             res.status(200).send(info);
         }
     });

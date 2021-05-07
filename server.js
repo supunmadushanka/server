@@ -8,18 +8,6 @@ const app = express();
 app.use(bodyParser.json());
 app.use(cors());
 
-const sqlconfig = {
-    user: 'sa',
-    password: '123',
-    server: 'DESKTOP-1CHJNQH',
-    database: 'sms',
-    port: 1433,
-    "options": {
-        "encrypt": true,
-        "enableArithAbort": true
-    }
-};
-
 app.use('/api', api)
 
 app.get('/', function(req, res) {

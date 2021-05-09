@@ -12,7 +12,7 @@ var PORT = 3000;
 const http = require('http').createServer(app);
 const io = require('socket.io')(http, {
     cors: {
-        origins: ['http://localhost:4200']
+        origins: ['https://mysport-codefreaks.herokuapp.com/']
     }
 });
 

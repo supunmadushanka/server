@@ -7,33 +7,6 @@ const bcrypt = require('bcrypt');
 const saltRounds = 5;
 const app = express();
 const sql = require('mssql');
-var PORT = 3000;
-
-const http = require('http').createServer(app);
-const io = require('socket.io')(http, {
-    cors: {
-        origins: ['https://mysport-codefreaks.herokuapp.com/']
-    }
-});
-
-app.get('/', (req, res) => {
-    res.send('<h1>Hey Socket.io</h1>');
-});
-
-http.listen(3001, () => {
-    console.log('listening on *:3001');
-});
-
-io.on('connection', (socket) => {
-    console.log('a user connected');
-    socket.on('disconnect', () => {
-        console.log('user disconnected');
-    });
-    socket.on('my message', (msg) => {
-        console.log('message: ' + msg);
-        io.emit('my broadcast', msg);
-    });
-});
 
 const sqlconfig = {
     db: '*sql.DB',

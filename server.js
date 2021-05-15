@@ -9,12 +9,15 @@ app.use(bodyParser.json());
 app.use(cors());
 
 const sqlconfig = {
+    db: '*sql.DB',
     user: 'supun',
     password: 'Ranjani1970#',
     server: 'mysport-codefreks.database.windows.net',
     database: 'mysport',
+    port: 1433,
     "options": {
-        "encrypt": true
+        "encrypt": true,
+        "enableArithAbort": true
     }
 };
 

@@ -9,12 +9,15 @@ const app = express();
 const sql = require('mssql');
 
 const sqlconfig = {
+    db: '*sql.DB',
     user: 'supun',
     password: 'Ranjani1970#',
     server: 'mysport-codefreks.database.windows.net',
     database: 'mysport',
+    port: 1433,
     "options": {
         "encrypt": true,
+        "enableArithAbort": true
     }
 };
 
@@ -282,6 +285,72 @@ router.delete('/deleteachieve/:achieveId', verifyToken, function(req, res) {
         console.log(err);
     })
     res.status(200).send({ "message": "Data received" });
+})
+
+router.get('/getteamtourupcoming', verifyToken, function(req, res) {
+    var teamId = req.query.teamId
+    sql.connect(sqlconfig).then(pool => {
+        let connection = sql.connect(sqlconfig, (err) => {
+            if (err) {
+                console.log(err);
+            } else {
+                var request = new sql.Request();
+                request
+                    .input('teamId', sql.Int, teamId)
+                    .query('select * from teamtournament where teamId=@teamId AND tournamentstatus is null', function(er, recordset) {
+                        if (err)
+                            console.log(er);
+                        else {
+                            res.send(recordset.recordset);
+                        }
+                    });
+            }
+        });
+    })
+})
+
+router.get('/getteamtourongoing', verifyToken, function(req, res) {
+    var teamId = req.query.teamId
+    sql.connect(sqlconfig).then(pool => {
+        let connection = sql.connect(sqlconfig, (err) => {
+            if (err) {
+                console.log(err);
+            } else {
+                var request = new sql.Request();
+                request
+                    .input('teamId', sql.Int, teamId)
+                    .query('select * from teamtournament where teamId=@teamId AND tournamentstatus=1', function(er, recordset) {
+                        if (err)
+                            console.log(er);
+                        else {
+                            res.send(recordset.recordset);
+                        }
+                    });
+            }
+        });
+    })
+})
+
+router.get('/getteamtourfinished', verifyToken, function(req, res) {
+    var teamId = req.query.teamId
+    sql.connect(sqlconfig).then(pool => {
+        let connection = sql.connect(sqlconfig, (err) => {
+            if (err) {
+                console.log(err);
+            } else {
+                var request = new sql.Request();
+                request
+                    .input('teamId', sql.Int, teamId)
+                    .query('select * from teamtournament where teamId=@teamId AND tournamentstatus=0', function(er, recordset) {
+                        if (err)
+                            console.log(er);
+                        else {
+                            res.send(recordset.recordset);
+                        }
+                    });
+            }
+        });
+    })
 })
 
 router.get('/addplayerview', verifyToken, function(req, res) {
@@ -815,6 +884,28 @@ router.get('/getsummery', verifyToken, function(req, res) {
                 request
                     .input('tournamentId', sql.Int, tournamentId)
                     .query('select * from tournamentsummery where tournementId=@tournamentId ORDER BY point DESC', function(er, recordset) {
+                        if (err)
+                            console.log(er);
+                        else {
+                            res.send(recordset.recordset);
+                        }
+                    });
+            }
+        });
+    })
+})
+
+router.get('/getinstituteinfo', verifyToken, function(req, res) {
+    var instituteId = req.query.instituteId
+    sql.connect(sqlconfig).then(pool => {
+        let connection = sql.connect(sqlconfig, (err) => {
+            if (err) {
+                console.log(err);
+            } else {
+                var request = new sql.Request();
+                request
+                    .input('instituteId', sql.Int, instituteId)
+                    .query('select * from institute i,Instituteadmin ia where instituteId=@instituteId AND i.userId=ia.userId', function(er, recordset) {
                         if (err)
                             console.log(er);
                         else {
@@ -1759,6 +1850,50 @@ router.get('/getplayerfixtures', verifyToken, function(req, res) {
     })
 })
 
+router.get('/getplayerfixturesongoing', verifyToken, function(req, res) {
+    var userId = req.query.userId
+    sql.connect(sqlconfig).then(pool => {
+        let connection = sql.connect(sqlconfig, (err) => {
+            if (err) {
+                console.log(err);
+            } else {
+                var request = new sql.Request();
+                request
+                    .input('userId', sql.Int, userId)
+                    .query('select * from Player_Fixture pf,Fixture f,Tournament t where pf.fixtureId=f.fixtureId AND PlayerId=@userId AND fixtureState=1 AND t.tournementId=f.tournementId', function(er, recordset) {
+                        if (err)
+                            console.log(er);
+                        else {
+                            res.send(recordset.recordset);
+                        }
+                    });
+            }
+        });
+    })
+})
+
+router.get('/getplayerfixturesfinished', verifyToken, function(req, res) {
+    var userId = req.query.userId
+    sql.connect(sqlconfig).then(pool => {
+        let connection = sql.connect(sqlconfig, (err) => {
+            if (err) {
+                console.log(err);
+            } else {
+                var request = new sql.Request();
+                request
+                    .input('userId', sql.Int, userId)
+                    .query('select * from Player_Fixture pf,Fixture f,Tournament t where pf.fixtureId=f.fixtureId AND PlayerId=@userId AND fixtureState=0 AND t.tournementId=f.tournementId', function(er, recordset) {
+                        if (err)
+                            console.log(er);
+                        else {
+                            res.send(recordset.recordset);
+                        }
+                    });
+            }
+        });
+    })
+})
+
 router.get('/getplayerparents', verifyToken, function(req, res) {
     var userId = req.query.userId
     sql.connect(sqlconfig).then(pool => {
@@ -2611,34 +2746,84 @@ router.post('/sendreview', function(req, res) {
     });
 })
 
-router.post('/test', function(req, res) {
+router.get('/totalinstitutes', function(req, res) {
+    sql.connect(sqlconfig).then(pool => {
+        let connection = sql.connect(sqlconfig, (err) => {
+            if (err) {
+                console.log(err);
+            } else {
+                var request = new sql.Request();
+                request
+                    .query('select count(instituteId) as institutecount from institute', function(er, recordset) {
+                        if (err)
+                            console.log(er);
+                        else {
+                            res.send(recordset.recordset);
+                        }
+                    });
+            }
+        });
+    })
+})
 
-    var transporter = nodemailer.createTransport({
-        service: 'gmail',
-        auth: {
-            user: 'supunmadushanka19980822@gmail.com',
-            pass: 'mynameissuperman#'
-        }
-    });
+router.get('/totalplayers', function(req, res) {
+    sql.connect(sqlconfig).then(pool => {
+        let connection = sql.connect(sqlconfig, (err) => {
+            if (err) {
+                console.log(err);
+            } else {
+                var request = new sql.Request();
+                request
+                    .query('select count(userId) as playercount from Player', function(er, recordset) {
+                        if (err)
+                            console.log(er);
+                        else {
+                            res.send(recordset.recordset);
+                        }
+                    });
+            }
+        });
+    })
+})
 
-    var mailOptions = {
-        from: 'supunmadushanka19980822@gmail.com',
-        to: 'supunmadushanka19980822@gmail.com',
-        subject: req.body.email + ' - ' + req.body.FullName,
-        text: req.body.message
-    }
+router.get('/totalteams', function(req, res) {
+    sql.connect(sqlconfig).then(pool => {
+        let connection = sql.connect(sqlconfig, (err) => {
+            if (err) {
+                console.log(err);
+            } else {
+                var request = new sql.Request();
+                request
+                    .query('select count(teamId) as teamcount from Team', function(er, recordset) {
+                        if (err)
+                            console.log(er);
+                        else {
+                            res.send(recordset.recordset);
+                        }
+                    });
+            }
+        });
+    })
+})
 
-    transporter.sendMail(mailOptions, function(error, info) {
-        if (error) {
-            console.log(error);
-        } else {
-            console.log('Email sent: ' + info.response);
-            response.setHeader('Access-Control-Allow-Origin', '*')
-            response.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS,DELETE,PUT')
-            response.setHeader('Access-Control-Allow-Headers', 'Origin, Content-Type, X-Auth-Token')
-            res.status(200).send(info);
-        }
-    });
+router.get('/totalcoaches', function(req, res) {
+    sql.connect(sqlconfig).then(pool => {
+        let connection = sql.connect(sqlconfig, (err) => {
+            if (err) {
+                console.log(err);
+            } else {
+                var request = new sql.Request();
+                request
+                    .query('select count(userId) as coachcount from Coach', function(er, recordset) {
+                        if (err)
+                            console.log(er);
+                        else {
+                            res.send(recordset.recordset);
+                        }
+                    });
+            }
+        });
+    })
 })
 
 module.exports = router

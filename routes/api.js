@@ -416,6 +416,107 @@ router.post('/removeplayer', verifyToken, function(req, res) {
     res.status(200).send({ "message": "Data received" });
 })
 
+router.post('/editteam', verifyToken, function(req, res) {
+    var teamid = req.query.teamid
+    sql.connect(sqlconfig).then(pool => {
+        return pool.request()
+            .input('teamid', sql.Int, teamid)
+            .input('teamName', sql.VarChar(20), req.body.TeamName)
+            .input('coachId', sql.Int, req.body.Coach)
+            .execute('editteam')
+    }).then(result => {}).catch(err => {
+        console.log(err);
+    })
+    res.status(200).send({ "message": "Data received" });
+})
+
+router.post('/addsession', verifyToken, function(req, res) {
+    var teamid = req.query.teamid
+    sql.connect(sqlconfig).then(pool => {
+        return pool.request()
+            .input('teamid', sql.Int, teamid)
+            .input('sessionDateTime', sql.VarChar(20), req.body.DateTime)
+            .input('venue', sql.VarChar(50), req.body.Venue)
+            .execute('addsession')
+    }).then(result => {}).catch(err => {
+        console.log(err);
+    })
+    res.status(200).send({ "message": "Data received" });
+})
+
+router.post('/addsessiondescrip', verifyToken, function(req, res) {
+    var teamid = req.query.teamid
+    var sessionId = req.query.sessionId
+    sql.connect(sqlconfig).then(pool => {
+        return pool.request()
+            .input('teamid', sql.Int, teamid)
+            .input('sessionId', sql.Int, sessionId)
+            .input('sessionSummery', sql.VarChar(500), req.body.description)
+            .execute('addsessiondescript')
+    }).then(result => {}).catch(err => {
+        console.log(err);
+    })
+    res.status(200).send({ "message": "Data received" });
+})
+
+router.get('/getupcomingsession', verifyToken, function(req, res) {
+    var teamId = req.query.teamId
+    sql.connect(sqlconfig).then(pool => {
+        let connection = sql.connect(sqlconfig, (err) => {
+            if (err) {
+                console.log(err);
+            } else {
+                var request = new sql.Request();
+                request
+                    .input('teamId', sql.Int, teamId)
+                    .input('state', sql.VarChar(10), 'upcoming')
+                    .query('select * from Practice_Session where teamId=@teamId AND sessionState=@state', function(er, recordset) {
+                        if (err)
+                            console.log(er);
+                        else {
+                            res.send(recordset.recordset);
+                        }
+                    });
+            }
+        });
+    })
+})
+
+router.get('/getfinishedsession', verifyToken, function(req, res) {
+    var teamId = req.query.teamId
+    sql.connect(sqlconfig).then(pool => {
+        let connection = sql.connect(sqlconfig, (err) => {
+            if (err) {
+                console.log(err);
+            } else {
+                var request = new sql.Request();
+                request
+                    .input('teamId', sql.Int, teamId)
+                    .input('state', sql.VarChar(10), 'finished')
+                    .query('select * from Practice_Session where teamId=@teamId AND sessionState=@state', function(er, recordset) {
+                        if (err)
+                            console.log(er);
+                        else {
+                            res.send(recordset.recordset);
+                        }
+                    });
+            }
+        });
+    })
+})
+
+router.post('/finishsession', verifyToken, function(req, res) {
+    var sessionId = req.query.sessionId
+    sql.connect(sqlconfig).then(pool => {
+        return pool.request()
+            .input('sessionId', sql.Int, sessionId)
+            .execute('finishsession')
+    }).then(result => {}).catch(err => {
+        console.log(err);
+    })
+    res.status(200).send({ "message": "Data received" });
+})
+
 router.post('/createtournament', verifyToken, function(req, res) {
     var Email = req.get('Email')
     sql.connect(sqlconfig).then(pool => {
@@ -2201,7 +2302,7 @@ router.post('/sendmail', (req, respond) => {
         from: 'supunmadushanka19980822@gmail.com',
         to: email,
         subject: 'Click to activate acount',
-        html: '<a href="http://localhost:4200/confirmemail?email=' + email + '">localhost:4200/home</a>'
+        html: '<a href="https://mysport-codefreaks.herokuapp.com/confirmemail?email=' + email + '">https://mysport-codefreaks.herokuapp.com/home</a>'
     }
 
     transporter.sendMail(mailOptions, function(error, info) {
@@ -2513,20 +2614,6 @@ router.post('/teamregister', verifyToken, function(req, res) {
             .input('sportId', sql.VarChar(10), req.body.Sport)
             .input('coachId', sql.Int, req.body.Coach)
             .execute('teamregister')
-    }).then(result => {}).catch(err => {
-        console.log(err);
-    })
-    res.status(200).send({ "message": "Data received" });
-})
-
-router.post('/editteam', verifyToken, function(req, res) {
-    var teamid = req.query.teamid
-    sql.connect(sqlconfig).then(pool => {
-        return pool.request()
-            .input('teamid', sql.Int, teamid)
-            .input('teamName', sql.VarChar(20), req.body.TeamName)
-            .input('coachId', sql.Int, req.body.Coach)
-            .execute('editteam')
     }).then(result => {}).catch(err => {
         console.log(err);
     })

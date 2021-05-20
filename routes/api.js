@@ -1209,7 +1209,7 @@ router.post('/addfixtureplayer', verifyToken, (req, res) => {
                                 .input('fixtureId', sql.Int, fixtureId)
                                 .input('tournamentTeamId', sql.Int, result.output.tournamentTeamId)
                                 .input('userId', sql.Int, userId)
-                                .query('insert into Player_Fixture(fixtureId,playerID,playerPoints,playerScore,tournamentTeamId,fixtureAvaial,AvaialReason,Confirm,overs,givescore,wickets,outnotout) values(@fixtureId,@userId,null,null,@tournamentTeamId,1,null,null,null,null,null,null)', function(er, recordset) {
+                                .query('insert into Player_Fixture(fixtureId,playerID,playerPoints,playerScore,tournamentTeamId,fixtureAvaial,AvaialReason,Confirm,overs,givescore,wickets,outnotout,ballFaced,Tries,FieldGoals,Conversions) values(@fixtureId,@userId,null,null,@tournamentTeamId,1,null,null,null,null,null,null,null,null,null,null)', function(er, recordset) {
                                     if (err)
                                         console.log(er);
                                     else {}
@@ -1388,6 +1388,10 @@ router.post('/addplayerscore', verifyToken, function(req, res) {
             .input('givescore', sql.Int, req.body.givescore)
             .input('wickets', sql.Int, req.body.wickets)
             .input('outnotout', sql.VarChar(10), req.body.status)
+            .input('ballFaced', sql.Int, req.body.balls)
+            .input('Tries', sql.Int, req.body.Tries)
+            .input('FieldGoals', sql.Int, req.body.FieldGoals)
+            .input('Conversions', sql.Int, req.body.Conversions)
             .input('tournamentTeamId', sql.Int, tournamentTeamId)
             .execute('addplayerscore')
     }).then(result => {}).catch(err => {

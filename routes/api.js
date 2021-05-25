@@ -505,12 +505,77 @@ router.get('/getfinishedsession', verifyToken, function(req, res) {
     })
 })
 
+router.get('/getsessionplayers', verifyToken, function(req, res) {
+    var sessionId = req.query.sessionId
+    sql.connect(sqlconfig).then(pool => {
+        let connection = sql.connect(sqlconfig, (err) => {
+            if (err) {
+                console.log(err);
+            } else {
+                var request = new sql.Request();
+                request
+                    .input('sessionId', sql.Int, sessionId)
+                    .query('select * from Session_Players sp,Player p where sessionId=@sessionId AND sp.playerId=p.userId', function(er, recordset) {
+                        if (err)
+                            console.log(er);
+                        else {
+                            res.send(recordset.recordset);
+                        }
+                    });
+            }
+        });
+    })
+})
+
 router.post('/finishsession', verifyToken, function(req, res) {
     var sessionId = req.query.sessionId
     sql.connect(sqlconfig).then(pool => {
         return pool.request()
             .input('sessionId', sql.Int, sessionId)
             .execute('finishsession')
+    }).then(result => {}).catch(err => {
+        console.log(err);
+    })
+    res.status(200).send({ "message": "Data received" });
+})
+
+router.post('/addsessionplayers', verifyToken, function(req, res) {
+    var sessionId = req.query.sessionId
+    var userId = req.query.userId
+
+    sql.connect(sqlconfig).then(pool => {
+        return pool.request()
+            .input('sessionId', sql.Int, sessionId)
+            .input('playerId', sql.Int, userId)
+            .execute('addsessionplayers')
+    }).then(result => {}).catch(err => {
+        console.log(err);
+    })
+
+    console.log(userId)
+    res.status(200).send({ "message": "Data received" });
+})
+
+router.post('/setparticipated', verifyToken, function(req, res) {
+    var sessionPlayerId = req.query.sessionPlayerId
+
+    sql.connect(sqlconfig).then(pool => {
+        return pool.request()
+            .input('sessionPlayerId', sql.Int, sessionPlayerId)
+            .execute('setparticipated')
+    }).then(result => {}).catch(err => {
+        console.log(err);
+    })
+    res.status(200).send({ "message": "Data received" });
+})
+
+router.post('/setnotparticipated', verifyToken, function(req, res) {
+    var sessionPlayerId = req.query.sessionPlayerId
+
+    sql.connect(sqlconfig).then(pool => {
+        return pool.request()
+            .input('sessionPlayerId', sql.Int, sessionPlayerId)
+            .execute('setnotparticipated')
     }).then(result => {}).catch(err => {
         console.log(err);
     })
@@ -753,7 +818,7 @@ router.get('/getupcomingfixture', verifyToken, function(req, res) {
                 var request = new sql.Request();
                 request
                     .input('tournementId', sql.Int, tournementId)
-                    .query('select * from Fixture f, Struture s where f.strutureId=s.strutureId AND tournementId=@tournementId AND fixtureState is null', function(er, recordset) {
+                    .query('select * from fixturetype f, Struture s where f.strutureId=s.strutureId AND tournementId=@tournementId AND fixtureState is null', function(er, recordset) {
                         if (err)
                             console.log(er);
                         else {
@@ -775,7 +840,7 @@ router.get('/getongoingfixture', verifyToken, function(req, res) {
                 var request = new sql.Request();
                 request
                     .input('tournementId', sql.Int, tournementId)
-                    .query('select * from Fixture f, Struture s where f.strutureId=s.strutureId AND tournementId=@tournementId AND fixtureState=1', function(er, recordset) {
+                    .query('select * from fixturetype f, Struture s where f.strutureId=s.strutureId AND tournementId=@tournementId AND fixtureState=1', function(er, recordset) {
                         if (err)
                             console.log(er);
                         else {
@@ -797,7 +862,7 @@ router.get('/getfinishedfixture', verifyToken, function(req, res) {
                 var request = new sql.Request();
                 request
                     .input('tournementId', sql.Int, tournementId)
-                    .query('select * from Fixture f, Struture s where f.strutureId=s.strutureId AND tournementId=@tournementId AND fixtureState=0', function(er, recordset) {
+                    .query('select * from fixturetype f, Struture s where f.strutureId=s.strutureId AND tournementId=@tournementId AND fixtureState=0', function(er, recordset) {
                         if (err)
                             console.log(er);
                         else {
@@ -1427,6 +1492,7 @@ router.post('/registerfixture', verifyToken, function(req, res) {
             .input('strutureId', sql.VarChar(10), req.body.FixtureStructure)
             .input('firstTournamentTeamId', sql.Int, req.body.FirstTeam)
             .input('secondTournamentTeamId', sql.Int, req.body.SecondTeam)
+            .input('typeId', sql.VarChar(50), req.body.FixtureType)
             .execute('registerfixture')
     }).then(result => {}).catch(err => {
         console.log(err);
@@ -1690,6 +1756,30 @@ router.get('/getplayerprofile', verifyToken, function(req, res) {
                 request
                     .input('userId', sql.Int, userId)
                     .query('select * from Player where userId=@userId', function(er, recordset) {
+                        if (err)
+                            console.log(er);
+                        else {
+                            res.send(recordset.recordset);
+                        }
+                    });
+            }
+        });
+    })
+})
+
+router.get('/getplayerattendance', verifyToken, function(req, res) {
+    var userId = req.query.userId
+    sql.connect(sqlconfig).then(pool => {
+        let connection = sql.connect(sqlconfig, (err) => {
+            if (err) {
+                console.log(err);
+            } else {
+                var request = new sql.Request();
+                request
+                    .input('userId', sql.Int, userId)
+                    .input('yes', sql.VarChar(5), 'yes')
+                    .input('no', sql.VarChar(5), 'no')
+                    .query('select count(playerId) as sessioncount,count(CASE WHEN attendance=@yes THEN 1 ELSE NULL END) as yescount, count(CASE WHEN attendance=@no THEN 1 ELSE NULL END) as notcount from Session_Players where playerId=@userId', function(er, recordset) {
                         if (err)
                             console.log(er);
                         else {
@@ -2915,6 +3005,44 @@ router.get('/totalcoaches', function(req, res) {
             }
         });
     })
+})
+
+router.post('/recoverpassword', function(req, res) {
+
+    var transporter = nodemailer.createTransport({
+        service: 'gmail',
+        auth: {
+            user: 'supunmadushanka19980822@gmail.com',
+            pass: 'mynameissuperman#'
+        }
+    });
+
+    var mailOptions = {
+        from: 'supunmadushanka19980822@gmail.com',
+        to: req.body.userEmail,
+        subject: 'Password reseted',
+        text: 'Your new password is :' + req.body.password
+    }
+
+    transporter.sendMail(mailOptions, function(error, info) {
+        if (error) {
+            console.log(error);
+        } else {
+            bcrypt.genSalt(10, function(err, salt) {
+                bcrypt.hash(req.body.password, salt, function(err, hash) {
+                    sql.connect(sqlconfig).then(pool => {
+                        return pool.request()
+                            .input('userEmail', sql.VarChar(50), req.body.userEmail)
+                            .input('userPassword', sql.VarChar(500), hash)
+                            .execute('resetpassword')
+                    }).then(result => {}).catch(err => {
+                        console.log(err);
+                    })
+                });
+            });
+            res.status(200).send({ "message": "Data received" });
+        }
+    });
 })
 
 module.exports = router
